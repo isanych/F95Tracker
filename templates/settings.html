@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Settings - F95Tracker{% endblock %}
+
+{% block content %}
+<div class="settings-page" x-data="settingsPage()">
+    <div class="settings-back">
+        <a href="/" class="btn btn-secondary">← Back to Library</a>
+    </div>
+
+    <h1>⚙️ Settings</h1>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <!-- F95zone Authentication -->
+    <div class="settings-section">
+        <h2>🔐 F95zone Authentication</h2>
+        <p class="settings-desc">Log in to F95zone to enable search, bookmarks import, and full content access.</p>
+
+        {% if logged_in %}
+        <div class="success-badge">✅ Logged in to F95zone</div>
+        <form action="/settings/logout" method="POST" style="display:inline">
+            <button type="submit" class="btn btn-danger">Logout</button>
+        </form>
+        {% else %}
+        <div class="warning-badge">❌ Not logged in - some features will be limited</div>
+
+        <!-- Login form -->
+        <div x-data="{showLogin: true, showCookies: false}">
+            <div class="login-tabs">
+                <button class="tab-btn" :class="{'active': showLogin}" @click="showLogin=true; showCookies=false">Login with Credentials</button>
+                <button class="tab-btn" :class="{'active': showCookies}" @click="showLogin=false; showCookies=true">Paste Cookies</button>
+            </div>
+
+            <div x-show="showLogin">
+                <form action="/settings/login" method="POST" class="settings-form">
+                    <label>Username</label>
+                    <input type="text" name="username" placeholder="F95zone username">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="F95zone password">
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <p class="settings-note">⚠️ Credentials are stored locally on this server only. They are used to obtain session cookies.</p>
+            </div>
+
+            <div x-show="showCookies">
+                <form action="/settings/save-cookies" method="POST" class="settings-form">
+                    <label>F95zone Cookies</label>
+                    <p class="settings-note">Open F95zone in your browser → F12 → Application → Cookies → copy <code>xf_user</code> and <code>xf_session</code> values.</p>
+                    <textarea name="cookies_text" rows="4" placeholder="xf_user=abc123&#10;xf_session=def456" class="input-full"></textarea>
+                    <button type="submit" class="btn btn-primary">Save Cookies</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- General Settings -->
+    <div class="settings-section">
+        <h2>📊 Refresh Settings</h2>
+        <form action="/settings/save" method="POST" class="settings-form">
+            <label>Auto-refresh interval (minutes)</label>
+            <input type="number" name="auto_refresh_interval" value="{{ settings.auto_refresh_interval }}" min="0" max="1440">
+            <p class="settings-note">Set to 0 to disable automatic refresh.</p>
+
+            <label class="checkbox-label">
+                <input type="checkbox" name="refresh_archived_games" value="1" {% if settings.refresh_archived_games %}checked{% endif %}>
+                Refresh archived games
+            </label>
+
+            <label class="checkbox-label">
+                <input type="checkbox" name="refresh_completed_games" value="1" {% if settings.refresh_completed_games %}checked{% endif %}>
+                Refresh completed games
+            </label>
+
+            <label>Max concurrent connections</label>
+            <input type="number" name="max_connections" value="{{ settings.max_connections }}" min="1" max="50">
+
+            <label>Request timeout (seconds)</label>
+            <input type="number" name="request_timeout" value="{{ settings.request_timeout }}" min="5" max="300">
+
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </form>
+    </div>
+
+    <!-- Labels -->
+    <div class="settings-section" x-data="labelsManager()">
+        <h2>🏷️ Labels</h2>
+        <div class="labels-list">
+            <template x-for="label in labels" :key="label.id">
+                <div class="label-item">
+                    <span class="label-color" :style="`background: ${label.color}`"></span>
+                    <input type="text" x-model="label.name" @change="updateLabel(label)" class="input-sm">
+                    <input type="color" x-model="label.color" @change="updateLabel(label)" class="color-input">
+                    <button @click="deleteLabel(label.id)" class="btn btn-sm btn-danger">✕</button>
+                </div>
+            </template>
+        </div>
+        <button @click="createLabel()" class="btn btn-secondary">+ Add Label</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="settings-section" x-data="tabsManager()">
+        <h2>📂 Tabs</h2>
+        <p class="settings-desc">Organize games into tabs. Assign tabs to games from the game detail page.</p>
+        <div class="tabs-list">
+            <template x-for="tab in tabs" :key="tab.id">
+                <div class="label-item">
+                    <span class="label-icon" x-text="tab.icon"></span>
+                    <span x-text="tab.name"></span>
+                    <button @click="deleteTab(tab.id)" class="btn btn-sm btn-danger">✕</button>
+                </div>
+            </template>
+        </div>
+        <div class="create-tab-form">
+            <input type="text" x-model="newTabName" placeholder="Tab name" class="input-sm" @keydown.enter="createTab()">
+            <input type="text" x-model="newTabIcon" placeholder="Icon" class="input-sm" style="width:60px" @keydown.enter="createTab()">
+            <button @click="createTab()" class="btn btn-sm btn-secondary">+ Add Tab</button>
+        </div>
+    </div>
+
+    <!-- Import -->
+    <div class="settings-section">
+        <h2>📥 Import from F95Checker</h2>
+        <p class="settings-desc">Import your game library from an existing F95Checker database.</p>
+        <form action="/import" method="POST" class="settings-form">
+            <input type="hidden" name="source" value="f95checker">
+            <label>F95Checker database path (optional - auto-detects default location)</label>
+            <input type="text" name="data" placeholder="C:\Users\...\AppData\Roaming\f95checker\db.sqlite3" class="input-full">
+            <button type="submit" class="btn btn-primary">Import</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

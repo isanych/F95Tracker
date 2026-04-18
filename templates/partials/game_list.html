@@ -1,0 +1,52 @@
+<div class="game-grid">
+    {% for game in games %}
+    <a href="/game/{{ game.id }}" class="game-card {% if game.updated %}updated{% endif %} {% if game.archived %}archived{% endif %}">
+        <div class="card-image">
+            {% if game.image_url or game.image_local %}
+            <img src="/game/{{ game.id }}/image" alt="{{ game.name }}" loading="lazy">
+            {% else %}
+            <div class="card-image-placeholder">
+                <span>{{ game.name[0] | upper }}</span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="card-title">{{ game.name }}</div>
+            <div class="card-meta">
+                <span class="badge" style="background: {{ game.type_color }}">{{ game.type_name }}</span>
+                <span class="badge status-badge" style="background: {{ game.status_color }}">{{ game.status_name }}</span>
+            </div>
+            <div class="card-info">
+                {% if game.version and game.version != 'Unchecked' %}
+                <span>{{ 'v' + game.version if game.version[:1].isdigit() else game.version }}</span>
+                {% endif %}
+                {% if game.developer %}
+                <span>{{ game.developer }}</span>
+                {% endif %}
+                {% if game.score > 0 %}
+                <span>⭐ {{ "%.1f" | format(game.score) }}</span>
+                {% endif %}
+            </div>
+            <div class="card-status">
+                {% if game.updated %}
+                <span class="status-tag updated-tag">🔔 Update</span>
+                {% endif %}
+                {% if game.installed %}
+                <span class="status-tag installed-tag">📥</span>
+                {% endif %}
+                {% if game.finished %}
+                <span class="status-tag finished-tag">🏁</span>
+                {% endif %}
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% if games|length == 0 %}
+<div class="empty-state">
+    <div class="empty-icon">📚</div>
+    <h3>No games found</h3>
+    <p>Add games by clicking the ➕ button or pressing <kbd>N</kbd></p>
+</div>
+{% endif %}

@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}{{ game.name }} - F95Tracker{% endblock %}
+
+{% block content %}
+<script>
+const _gameData = {{ game | tojson }};
+const _timelineData = {{ timeline | tojson }};
+</script>
+<div class="detail-page" x-data="gameDetail(_gameData, _timelineData)">
+    <div class="detail-back">
+        <a href="/" class="btn btn-secondary">← Back to Library</a>
+    </div>
+
+    <div class="detail-layout">
+        <!-- Sidebar -->
+        <div class="detail-sidebar">
+            <div class="detail-image">
+                {% if game.image_url or game.image_local %}
+                <img src="/game/{{ game.id }}/image" alt="{{ game.name }}" @error="$el.src=''">
+                {% else %}
+                <div class="detail-image-placeholder">
+                    <span>{{ game.name[0] | upper }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="detail-actions">
+                <a href="{{ game.url }}" target="_blank" class="btn btn-primary" {% if not game.url %}style="display:none"{% endif %}>
+                    🔗 Open on F95zone
+                </a>
+                <a href="/proxy/threads/{{ game.id }}" target="_blank" class="btn btn-secondary" {% if not game.url %}style="display:none"{% endif %}>
+                    🛡️ Proxy
+                </a>
+                <button class="btn btn-secondary" @click="refreshGame()" :disabled="refreshing" x-text="refreshing ? '⏳ Checking...' : '🔄 Check for Updates'"></button>
+                <button class="btn btn-danger" @click="confirmDelete()">🗑️ Remove Game</button>
+            </div>
+
+            <div class="detail-quick-info">
+                <div class="info-row">
+                    <span class="info-label">Type</span>
+                    <span class="badge" style="background: {{ game.type_color }}">{{ game.type_name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status</span>
+                    <span class="badge" style="background: {{ game.status_color }}">{{ game.status_name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Version</span>
+                    <span x-text="game.version !== 'Unchecked' ? formatVersion(game.version) : 'N/A'"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Developer</span>
+                    <span x-text="game.developer || 'N/A'"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Score</span>
+                    <span x-text="game.score > 0 ? game.score.toFixed(1) + ' (' + game.votes + ' votes)' : 'N/A'"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Added</span>
+                    <span x-text="game.added_on ? new Date(game.added_on * 1000).toLocaleDateString() : 'N/A'"></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Updated</span>
+                    <span x-text="game.last_updated ? new Date(game.last_updated * 1000).toLocaleDateString() : 'N/A'"></span>
+                </div>
+            </div>
+
+            <!-- Status toggles -->
+            <div class="detail-toggles">
+                <div class="toggle-row">
+                    <span>Tab:</span>
+                    <select x-model="game.tab" @change="updateTab()" class="filter-select" style="flex:1">
+                        <option :value="null">No tab</option>
+                        <template x-for="tab in tabs" :key="tab.id">
+                            <option :value="tab.id" x-text="tab.icon + ' ' + tab.name"></option>
+                        </template>
+                    </select>
+                </div>
+                <label class="toggle-row">
+                    <input type="checkbox" :checked="game.installed" @change="toggleField('installed', $event)">
+                    <span>Installed</span>
+                    <input type="text" class="input-sm" x-model="game.installed" x-show="game.installed" placeholder="Version">
+                </label>
+                <label class="toggle-row">
+                    <input type="checkbox" :checked="game.finished" @change="toggleField('finished', $event)">
+                    <span>Finished</span>
+                    <input type="text" class="input-sm" x-model="game.finished" x-show="game.finished" placeholder="Version">
+                </label>
+                <label class="toggle-row">
+                    <input type="checkbox" :checked="game.archived" @change="toggleField('archived', $event)">
+                    <span>Archived</span>
+                </label>
+                <div class="toggle-row">
+                    <span>Rating:</span>
+                    <div class="star-rating">
+                        <template x-for="i in 5">
+                            <span @click="setRating(i)" :class="i <= game.rating ? 'star-filled' : 'star-empty'" x-text="i <= game.rating ? '★' : '☆'"></span>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="detail-notes">
+                <h3>Notes</h3>
+                <textarea x-model="game.notes" @change="saveNotes()" placeholder="Add personal notes..." rows="4"></textarea>
+            </div>
+
+            {% if game.tags %}
+            <div class="detail-tags">
+                <h3>Tags</h3>
+                <div class="tag-list">
+                    {% for tag in game.tags %}
+                    <span class="tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Main content -->
+        <div class="detail-main">
+            <h1 class="detail-title" x-text="game.name"></h1>
+            {% if game.updated %}
+            <div class="update-banner">🔔 New update available! <span x-text="game.version !== 'Unchecked' ? formatVersion(game.version) : ''"></span></div>
+            {% endif %}
+
+            <!-- Timeline -->
+            <div class="detail-section" x-show="timeline.length > 0">
+                <h3>📋 Timeline</h3>
+                <div class="timeline">
+                    <template x-for="evt in timeline" :key="evt.timestamp">
+                        <div class="timeline-item">
+                            <span class="timeline-icon" x-text="evt.icon"></span>
+                            <div class="timeline-content">
+                                <span class="timeline-text" x-text="evt.text"></span>
+                                <span class="timeline-time" x-text="evt.time_str"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="detail-section" x-show="game.description" x-html="game.description || ''">
+                <h3>📖 Description</h3>
+                <div class="detail-content" x-html="game.description || ''"></div>
+            </div>
+
+            <!-- Changelog -->
+            <div class="detail-section" x-show="game.changelog">
+                <h3>📝 Changelog</h3>
+                <div class="detail-content changelog-content" x-html="game.changelog || ''"></div>
+            </div>
+
+            <!-- Downloads -->
+            {% if game.downloads %}
+            <div class="detail-section">
+                <h3>📥 Downloads</h3>
+                {% for download in game.downloads %}
+                <div class="download-group">
+                    <h4>{{ download[0] if download else '' }}</h4>
+                    {% if download|length > 1 %}
+                    <div class="download-links">
+                        {% for link in download[1] %}
+                        <a href="{{ link[1] if link|length > 1 else '#' }}" target="_blank" class="btn btn-sm">{{ link[0] if link|length > 0 else 'Link' }}</a>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

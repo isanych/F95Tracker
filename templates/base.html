@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}F95Tracker{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+<body x-data="f95tracker()" x-init="init()">
+    <header class="header">
+        <div class="header-left">
+            <a href="/" class="logo">🎮 F95Tracker</a>
+        </div>
+        <div class="header-center">
+            <div class="search-bar">
+                <input type="text" placeholder="Search library... (Enter to search F95zone)" x-model="searchQuery" @keydown.enter="searchHeader()" @input="debouncedSearch()">
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="stats-badge" x-text="`📊 ${stats.total} games | 🔔 ${stats.updated} updates`"></span>
+            <button class="btn btn-icon" @click="showAddModal = true" title="Add Game">➕</button>
+            <button class="btn btn-primary" @click="refreshAll()" :disabled="refreshing" x-text="refreshing ? '⏳ Refreshing...' : '🔄 Refresh'"></button>
+            <a href="/proxy" target="_blank" class="btn btn-secondary">🌐 Proxy</a>
+            <a href="/settings" class="btn btn-secondary">⚙️ Settings</a>
+        </div>
+    </header>
+
+    {% block toolbar %}{% endblock %}
+
+    {% block content %}{% endblock %}
+
+    <!-- Add Game Modal -->
+    <div class="modal-overlay" x-show="showAddModal" x-cloak @click.self="showAddModal = false">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Add Game</h2>
+                <button class="btn-close" @click="showAddModal = false">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="tabs">
+                    <button class="tab-btn" :class="{'active': addTab === 'url'}" @click="addTab='url'">By URL</button>
+                    <button class="tab-btn" :class="{'active': addTab === 'search'}" @click="addTab='search'">Search</button>
+                    <button class="tab-btn" :class="{'active': addTab === 'custom'}" @click="addTab='custom'">Custom</button>
+                </div>
+
+                <div x-show="addTab === 'url'">
+                    <p>Paste an F95zone thread URL:</p>
+                    <input type="text" placeholder="https://f95zone.to/threads/..." x-model="addUrl" class="input-full" @keydown.enter="addByUrl()">
+                    <div x-show="addError" class="error-msg" x-text="addError"></div>
+                    <button class="btn btn-primary" @click="addByUrl()" :disabled="addLoading || !addUrl" x-text="addLoading ? 'Adding...' : 'Add Game'"></button>
+                </div>
+
+                <div x-show="addTab === 'search'">
+                    <div class="search-form">
+                        <input type="text" placeholder="Search games..." x-model="searchQ" @keydown.enter="searchF95()" class="input-full">
+                        <select x-model="searchCategory" class="filter-select">
+                            <option value="games">Games</option>
+                            <option value="comics">Comics</option>
+                            <option value="animations">Animations</option>
+                            <option value="assets">Assets</option>
+                        </select>
+                        <button class="btn btn-primary" @click="searchF95()" :disabled="searchLoading || !searchQ" x-text="searchLoading ? 'Searching...' : 'Search'"></button>
+                    </div>
+                    <div class="search-results" x-show="searchResults.length > 0">
+                        <template x-for="r in searchResults" :key="r.id">
+                            <div class="search-result-item" @click="addByUrlUrl(r.url)">
+                                <span x-text="r.title"></span>
+                                <span class="text-dim" x-text="r.creator ? `[${r.creator}]` : ''"></span>
+                                <span class="text-dim" x-text="gameIds.has(r.id) ? '✓ In library' : ''"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div x-show="addTab === 'custom'">
+                    <input type="text" x-model="customName" class="input-full" placeholder="Game name">
+                    <button class="btn btn-primary" @click="addCustom()" :disabled="addLoading" x-text="addLoading ? 'Adding...' : 'Add Custom Game'"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div class="toast-container">
+        <template x-for="(toast, idx) in toasts" :key="idx">
+            <div class="toast" :class="toast.type" x-text="toast.message"
+                 x-show="true" x-transition x-init="setTimeout(() => toasts.splice(idx, 1), 4000)"></div>
+        </template>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

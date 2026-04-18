@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}F95Tracker - Game Library{% endblock %}
+
+{% block toolbar %}
+<div class="toolbar">
+    <div class="toolbar-left">
+        <div class="filter-group">
+            <button class="filter-btn" :class="{'active': filter === 'all'}" @click="setFilter('all')">All</button>
+            <button class="filter-btn" :class="{'active': filter === 'updated'}" @click="setFilter('updated')">🔔 Updated</button>
+            <button class="filter-btn" :class="{'active': filter === 'installed'}" @click="setFilter('installed')">📥 Installed</button>
+            <button class="filter-btn" :class="{'active': filter === 'finished'}" @click="setFilter('finished')">🏁 Finished</button>
+            <button class="filter-btn" :class="{'active': filter === 'archived'}" @click="setFilter('archived')">📦 Archived</button>
+        </div>
+    </div>
+    <div class="toolbar-center">
+        <div class="filter-group" x-show="tabs.length > 0">
+            <button class="filter-btn" :class="{'active': activeTab === 0}" @click="setTab(0)">All</button>
+            <template x-for="tab in tabs" :key="tab.id">
+                <button class="filter-btn" :class="{'active': activeTab === tab.id}" @click="setTab(tab.id)" x-text="tab.icon + ' ' + tab.name"></button>
+            </template>
+        </div>
+        <select class="filter-select" @change="setFilter('status:' + $event.target.value)">
+            <option value="">Status...</option>
+            {% for val, name in game_statuses.items() %}
+            <option value="{{ val }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+        <select class="filter-select" @change="setFilter('type:' + $event.target.value)">
+            <option value="">Type...</option>
+            {% for val, name in game_types.items() %}
+            <option value="{{ val }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="toolbar-right">
+        <select class="sort-select" x-model="sortBy" @change="savePrefs()">
+            <option value="added_on">Date Added</option>
+            <option value="name">Name</option>
+            <option value="score">Score</option>
+            <option value="last_updated">Last Updated</option>
+        </select>
+        <select class="sort-select" x-model="sortDir" @change="savePrefs()">
+            <option value="desc">↓ Desc</option>
+            <option value="asc">↑ Asc</option>
+        </select>
+        <button class="btn btn-icon view-toggle" @click="viewMode = viewMode === 'grid' ? 'list' : 'grid'; savePrefs()" x-text="viewMode === 'grid' ? '☰' : '⊞'" :title="viewMode === 'grid' ? 'List view' : 'Grid view'"></button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="game-container" x-ref="gameContainer">
+    <!-- Grid View -->
+    <div class="game-grid" x-show="viewMode === 'grid'">
+        <template x-for="game in filteredGames" :key="game.id">
+            <a :href="`/game/${game.id}`" class="game-card" :class="{'updated': game.updated, 'archived': game.archived}">
+                <div class="card-image">
+                    <img x-show="game.image_url || game.image_local"
+                         :src="`/game/${game.id}/image`"
+                         :alt="game.name" loading="lazy"
+                         @error="$el.style.display='none'">
+                    <div class="card-image-placeholder" x-show="!game.image_url && !game.image_local">
+                        <span x-text="game.name.charAt(0).toUpperCase()"></span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="card-title" x-text="game.name" :title="game.name"></div>
+                    <div class="card-meta">
+                        <span class="badge" :style="`background: ${game.type_color}`" x-text="game.type_name"></span>
+                        <span class="badge status-badge" :style="`background: ${game.status_color}`" x-text="game.status_name"></span>
+                    </div>
+                    <div class="card-info">
+                        <span x-show="game.version && game.version !== 'Unchecked'" x-text="formatVersion(game.version)"></span>
+                        <span x-show="game.developer" x-text="game.developer"></span>
+                        <span x-show="game.score > 0" x-text="'⭐ ' + game.score.toFixed(1)"></span>
+                    </div>
+                    <div class="card-status">
+                        <span x-show="game.updated" class="status-tag updated-tag">🔔 Update</span>
+                        <span x-show="game.installed" class="status-tag installed-tag">📥 Installed</span>
+                        <span x-show="game.finished" class="status-tag finished-tag">🏁 Finished</span>
+                    </div>
+                </div>
+            </a>
+        </template>
+    </div>
+
+    <!-- List View -->
+    <div class="game-list" x-show="viewMode === 'list'">
+        <table>
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Name</th>
+                    <th>Version</th>
+                    <th>Developer</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Score</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="game in filteredGames" :key="game.id">
+                    <tr class="game-row" :class="{'updated-row': game.updated, 'archived-row': game.archived}"
+                        @click="window.location.href=`/game/${game.id}`">
+                        <td>
+                            <div class="row-thumb">
+                                <img x-show="game.image_url || game.image_local"
+                                     :src="`/game/${game.id}/image`" loading="lazy"
+                                     @error="$el.style.display='none'">
+                                <span x-show="!game.image_url && !game.image_local" x-text="game.name.charAt(0)"></span>
+                            </div>
+                        </td>
+                        <td class="row-name" x-text="game.name"></td>
+                        <td x-text="game.version !== 'Unchecked' ? game.version : '-'"></td>
+                        <td x-text="game.developer || '-'"></td>
+                        <td><span class="badge" :style="`background: ${game.type_color}`" x-text="game.type_name"></span></td>
+                        <td><span class="badge status-badge" :style="`background: ${game.status_color}`" x-text="game.status_name"></span></td>
+                        <td x-text="game.score > 0 ? game.score.toFixed(1) : '-'"></td>
+                        <td>
+                            <span x-show="game.updated" class="status-tag updated-tag">🔔</span>
+                            <span x-show="game.installed" class="status-tag installed-tag">📥</span>
+                        </td>
+                        <td>
+                            <span x-text="game.last_updated ? new Date(game.last_updated * 1000).toLocaleDateString() : ''"></span>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="empty-state" x-show="filteredGames.length === 0">
+        <div class="empty-icon">📚</div>
+        <h3>No games found</h3>
+        <p>Add games by clicking the ➕ button or pressing <kbd>N</kbd></p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Initial games data from server
+window.__GAMES__ = {{ games | tojson }};
+window.__GAME_IDS__ = {{ games | map(attribute='id') | list | tojson }};
+</script>
+{% endblock %}
